@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
 st.title('Fuel Price Forecasting App')
@@ -27,39 +28,75 @@ diesel = diesel[diesel['city'] == city]
 st.header(f"Petrol Prices - {city}")
 
 st.write(
-    petrol.head()
+    petrol.tail(5)
 )
 
 st.header(f"Diesel Prices - {city}")
 
 st.write(
-    diesel.head()
+    diesel.tail(5)
 )
 
-petrol1 = pd.read_csv(
-    'petrol_orecast.csv'
+# Convert date column
+petrol["ds"] = pd.to_datetime(petrol["ds"], errors="coerce")
+petrol = petrol.dropna(subset=["ds"])
+petrol["year"] = petrol["ds"].dt.year
+
+petrol_yearly = (
+    petrol.groupby("year")["yhat"]
+    .mean()
+    .reset_index()
 )
 
-diesel1 = pd.read_csv(
-    'diesel_orecast.csv'
+# Diesel data
+diesel["ds"] = pd.to_datetime(diesel["ds"], errors="coerce")
+diesel = diesel.dropna(subset=["ds"])
+diesel["year"] = diesel["ds"].dt.year
+
+diesel_yearly = (
+    diesel.groupby("year")["yhat"]
+    .mean()
+    .reset_index()
 )
 
-fig, ax = plt.subplots(figsize=(10,5))
-
-ax.plot(
-    petrol1['ds'],
-    petrol1['yhat'],
-    label='Petrol'
+# Merge data
+combined = pd.merge(
+    petrol_yearly,
+    diesel_yearly,
+    on="year",
+    suffixes=("_petrol", "_diesel")
 )
 
-ax.plot(
-    diesel1['ds'],
-    diesel1['yhat'],
-    label='Diesel'
+# Plot
+fig, ax = plt.subplots(figsize=(14, 7))
+
+x = np.arange(len(combined["year"]))
+width = 0.4
+
+ax.bar(
+    x - width/2,
+    combined["yhat_petrol"],
+    width,
+    label="Petrol",
+    color="blue"
 )
 
-plt.xticks(rotation=45)
+ax.bar(
+    x + width/2,
+    combined["yhat_diesel"],
+    width,
+    label="Diesel",
+    color="orange"
+)
 
-plt.legend()
+ax.set_title("Average Fuel Rate by Year")
+ax.set_xlabel("Year")
+ax.set_ylabel("Average Fuel Rate")
+ax.set_xticks(x)
+ax.set_xticklabels(combined["year"])
+ax.legend()
+
+plt.tight_layout()
+#plt.show()
 
 st.pyplot(fig)
